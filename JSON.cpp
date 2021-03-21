@@ -20,7 +20,7 @@ std::string JSON::ToJSON(const std::unordered_map<std::string, Variant>& map, bo
 
 	std::string string;
 
-	Variant variant = &map;
+	Variant variant = (std::unordered_map<std::string, Variant>*)&map;
 
 	if (prettyPrint)
 		WriteValue<true>(variant, string);
@@ -44,7 +44,7 @@ std::unordered_map<std::string, Variant> JSON::ParseJSON(const std::string& stri
 
 	std::unordered_map<std::string, Variant> map;
 
-	Variant variant = &map;
+	Variant variant = (std::unordered_map<std::string, Variant>*)&map;
 	ParseValue(variant, string, i);
 
 	return map;
