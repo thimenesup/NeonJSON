@@ -5,13 +5,13 @@
 #define PUT_VARIANT(var)\
 uint16_t containerType = toContainer.GetType();\
 if (containerType == Variant::Dictionary) {\
-	auto& map = *(std::unordered_map<std::string, Variant>*)toContainer.GetData();\
-	map[currentKey] = var;\
+	std::unordered_map<std::string, Variant>& map = *(std::unordered_map<std::string, Variant>*)toContainer.GetData();\
+	map[currentKey] = std::move(var);\
 	expectingKey = true;\
 }\
-else if (containerType == Variant::VariantArray) {\
-	auto& vector = *(std::vector<Variant>*)toContainer.GetData();\
-	vector.push_back(var);\
+else {\
+	std::vector<Variant>& vector = *(std::vector<Variant>*)toContainer.GetData();\
+	vector.push_back(std::move(var));\
 	expectingKey = false;\
 }\
 
@@ -35,7 +35,7 @@ std::unordered_map<std::string, Variant> JSON::ParseJSON(const std::string& stri
 	//Search first for the expected begin, skipping the character on the recursive function avoiding creating an additional dictionary
 	size_t i;
 	for (i = 0; i < string.size(); ++i) {
-		const uint8_t& c = string[i];
+		const uint8_t c = string[i];
 		if (c == '{') {
 			++i; //Skip it
 			break;
@@ -47,7 +47,7 @@ std::unordered_map<std::string, Variant> JSON::ParseJSON(const std::string& stri
 	Variant variant = (std::unordered_map<std::string, Variant>*)&map;
 	ParseValue(variant, string, i);
 
-	return map;
+	return std::move(map);
 }
 
 template <bool PrettyPrint>
@@ -90,7 +90,7 @@ void JSON::WriteValue(const Variant& variant, std::string& string, uint32_t inde
 		std::string str = std::string(variant);
 
 		std::string escapedString = "";
-		for (char c : str) { //Escape quote characters
+		for (const char c : str) { //Escape quote characters
 			if (c == '"')
 				escapedString += '\\';
 			escapedString += c;
@@ -219,7 +219,7 @@ void JSON::ParseValue(Variant& toContainer, const std::string& string, size_t& i
 			escapedString.reserve(token.size() - 2); //-2 since we ignore quotes
 
 			for (size_t i = 1; i < token.size() - 1; ++i) { //Start at 1 and -1 size to remove quotes
-				const uint8_t& character = token[i];
+				const uint8_t character = token[i];
 				if (character == '\\' && i < token.size() - 2 && token[i + 1] == '"') {
 					continue;
 				}
@@ -251,14 +251,14 @@ void JSON::ParseValue(Variant& toContainer, const std::string& string, size_t& i
 		}
 
 		if (token[0] == 'n') { //if (token == "null") {
-			Variant variant;
+			Variant variant = (void*)nullptr;
 			PUT_VARIANT(variant);
 			continue;
 		}
 
 		if (isdigit(token[0]) || token[0] == '-') { //Numbers: Check for minus '-' too for negative numbers
 			bool isInteger = true;
-			for (const uint8_t& character : token) {
+			for (const uint8_t character : token) {
 				if (character == '.' || character == 'e') {
 					isInteger = false;
 					break;
@@ -283,15 +283,15 @@ void JSON::ParseValue(Variant& toContainer, const std::string& string, size_t& i
 
 		if (token[0] == '{') { //if (token == "{") {
 			Variant variant = std::unordered_map<std::string, Variant>();
-			PUT_VARIANT(variant);
 			ParseValue(variant, string, index);
+			PUT_VARIANT(variant);
 			continue;
 		}
 
 		if (token[0] == '[') { //if (token == "[") {
 			Variant variant = std::vector<Variant>();
-			PUT_VARIANT(variant);
 			ParseValue(variant, string, index);
+			PUT_VARIANT(variant);
 			continue;
 		}
 
@@ -310,7 +310,7 @@ void JSON::ParseValue(Variant& toContainer, const std::string& string, size_t& i
 void JSON::GetToken(const std::string_view& source, size_t& i, std::string_view& token) {
 
 	for (i; i < source.size(); ++i) {
-		const uint8_t& character = source[i];
+		const uint8_t character = source[i];
 
 		//Skip whitespace
 		if (isspace(character))
@@ -355,7 +355,7 @@ void JSON::GetToken(const std::string_view& source, size_t& i, std::string_view&
 		if (character == '"') { //String start
 			size_t start = i;
 			for (i += 1; i < source.size(); ++i) {
-				const uint8_t& nextCharacter = source[i];
+				const uint8_t nextCharacter = source[i];
 				if (nextCharacter == '"' && source[i - 1] != '\\') { //String delimiter found, since previous char isn't a escape character
 					++i;
 					break;
@@ -379,8 +379,8 @@ void JSON::GetToken(const std::string_view& source, size_t& i, std::string_view&
 bool JSON::SubstringOnCharacter(const std::string_view& string, std::string_view& substring, const std::vector<uint8_t>& characters) {
 
 	for (size_t i = 0; i < string.size(); ++i) {
-		const uint8_t& character = string[i];
-		for (const auto& c : characters) {
+		const uint8_t character = string[i];
+		for (const uint8_t c : characters) {
 			if (character == c) {
 				if (i == 0) //Avoids substringing nothing if the first character is a delimiter
 					i = 1;
